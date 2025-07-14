@@ -2,45 +2,51 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\SendMessageRequest;
+use App\Http\Resources\MessageResource;
 use App\Models\User;
-use App\Models\Message;
-use App\Events\MessageSent;
+use App\Services\Contracts\ChatServiceInterface;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Throwable;
 
 class ChatController extends Controller
 {
-    public function index(User $user)
+    public function __construct(
+        private readonly ChatServiceInterface $chatService,
+        private readonly Authenticatable $authenticatedUser,
+    ) {}
+
+    public function show(User $user): View
     {
-        return Message::query()
-            ->where(function ($query) use ($user) {
-                $query->where('sender_id', auth()->id())
-                    ->where('receiver_id', $user->id);
-            })
-            ->orWhere(function ($query) use ($user) {
-                $query->where('sender_id', $user->id)
-                    ->where('receiver_id', auth()->id());
-            })
-            ->with(['sender', 'receiver'])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        return view('chat', compact('user'));
     }
 
-    public function show(User $user)
+    public function index(User $user): AnonymousResourceCollection
     {
-        return view('chat', [
-            'user' => $user
-        ]);
+        $messages = $this->chatService->getConversationBetweenUsers(
+            $this->authenticatedUser->getAuthIdentifier(),
+            $user->id,
+        );
+
+        return MessageResource::collection($messages);
     }
 
-    public function sendMessage(Request $request, User $user)
-    {
-        $message = Message::create([
-            'sender_id' => auth()->id(),
-            'receiver_id' => $user->id,
-            'text' => $request->input('message')
-        ]);
-        broadcast(new MessageSent($message));
 
-        return response()->json($message);
+    public function sendMessage(SendMessageRequest $request, User $user): MessageResource
+    {
+        try {
+            $dto = $request->toDTO(receiverId: $user->id, senderId: $this->authenticatedUser->getAuthIdentifier());
+
+            $message = $this->chatService->sendMessage($dto);
+
+            return new MessageResource($message);
+        } catch (Throwable $e) {
+            report($e);
+
+            abort(HttpResponse::HTTP_INTERNAL_SERVER_ERROR, 'Message could not be sent.');
+        }
     }
 }

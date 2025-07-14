@@ -111,7 +111,6 @@ const sendMessage = async () => {
 const sendTypingEvent = () => {
     Echo.private(`chat.${props.user.id}`).whisper("typing", {
         userID: props.currentUser.id,
-        text: newMessage.value,
     });
 };
 
@@ -140,7 +139,7 @@ onMounted(() => {
         })
         .listenForWhisper("typing", (response) => {
             isUserTyping.value = response.userID === props.user.id;
-            newMessage.value = response.text.toString();
+
             if (isUserTypingTimer.value) {
                 clearTimeout(isUserTypingTimer.value);
             }

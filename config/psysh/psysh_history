@@ -1,0 +1,6 @@
+_HiStOrY_V2_
+event(new\040\134App\134Events\134SomeEvent())
+event(new\040\134App\134Events\134MessageEvent())
+event(new\040\134App\134Events\134MessageSent())
+event(new\040\134App\134Events\134MessageSent(new\040Message()))
+exit
